@@ -1,0 +1,65 @@
+SUBROUTINE CALFLU(VOL,SIGR,YI,XIK,QI,VOLY,FLUQ,FLUJ,FLUX,REMO)
+DIMENSION VOL(mmax),SIGR(mmax),YI(mmax),XIK(mmax,mmax),QI(mmax),VOLY(mmax),FLUQ(mmax),FLUJ(mmax),FLUX(mmax),REMO(mmax)
+common /CPR001/ nin,NOT,nx1(2)
+common /CPR002/ mmax,NX202,ALBEDO,NX204,SB,NX206
+LOGICAL SWMORE
+REAL JEXT,JMINUS,JNET,JPLUS
+1010 format(6e12.4)
+1020 FORMAT(2E12.4,L6)
+
+
+!
+! READ SOURCE DISTRIBUTION
+10 READ(NIN,*) (QI(I),I=1,MMAX)
+READ(NIN,*) ALBEDO,JEXT !,SWMORE
+!
+! EVALUATE BLACK BOUNDARY SOURCE LEAKAGE, X, AND CURRENTS
+QSB = 0.25*SB
+AQSB = ALBEDO*QSB
+X=0.0
+Y=1.0
+DO I=1,MMAX
+  VOLY(I) = VOL(I)*YI(I)
+  X=X+VOLY(I)*QI(I)
+  Y=Y-VOLY(I)*SIGR(I)
+ENDDO
+write(*,*) "removal blackness", 1-Y
+X=QSB*X
+print*,x
+BFACT=1.0/(1.0-ALBEDO*Y)
+JPLUS=BFACT*(X+Y*JEXT)
+JMINUS=BFACT*(ALBEDO*X+JEXT)
+JNET=JPLUS-JMINUS
+!
+! CAL ACTUAL REAPONSE FLUXES
+DO I=1,MMAX
+  YI(I)=BFACT*YI(I)
+  FACT=AQSB*YI(I)
+  DO K=1,MMAX
+    XIK(I,K)=XIK(I,K) +FACT *VOLY(K)
+  ENDDO
+ENDDO
+!
+! CALCULATE FLUX AND REMOVAL PER REGION
+QTOT=0.0
+RTOT=0.0
+DO I=1,MMAX
+  SUM=0.0
+  DO K=1,MMAX
+    SUM=SUM+QI(K)*XIK(I,K)
+  ENDDO
+  FLUQ(I) = SUM
+  FLUJ(I) = JEXT*YI(I)
+  FLUX(I) = SUM+FLUJ(I)
+  REMO(I) = SIGR(I)*FLUX(I)*VOL(I)
+  QTOT=QTOT+QI(I)*VOL(I)
+  RTOT=RTOT+REMO(I)
+ENDDO
+
+write(not,'(" jnet = ",e11.4," jplus = ",e11.4," jmius = ",e11.4)') JNET,JPLUS,JMINUS
+write(not,*) " region   source  sorflux  curflux  total flux   removal"
+write(not,'(1x,i5,1x,1p5e12.4)') (i,qi(i),fluq(i),fluj(i),flux(i),remo(i),i=1,mmax)
+
+RETURN
+END
+
